@@ -99,10 +99,19 @@ async def process_photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
     data['photo'] = message.photo[-1].file_id
     users[message.from_user.id] = data
-    await message.answer("🎉 Анкета создана! Теперь ты можешь искать людей. Напиши /find")
     await state.finish()
 
+    # Добавим кнопку
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton("🔍 Найти собеседника")]],
+        resize_keyboard=True
+    )
+    await message.answer("🎉 Анкета создана! Теперь ты можешь искать людей 👇", reply_markup=kb)
+
 @dp.message_handler(commands='find')
+@dp.message_handler(lambda message: message.text == "🔍 Найти собеседника")
+async def find_by_button(message: types.Message):
+    await find_match(message)
 async def find_match(message: types.Message):
     user = users.get(message.from_user.id)
     if not user:
