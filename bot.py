@@ -106,6 +106,30 @@ async def find_match(message: types.Message):
             await bot.send_photo(message.chat.id, data['photo'], caption=text)
             return
     await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
+from aiogram.filters import Command
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.context import FSMContext
+
+# Простой список, чтобы пока проверять регистрацию
+users = set()
+
+class Profile(StatesGroup):
+    name = State()
+
+@dp.message(Command("start"))
+async def start_handler(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+
+    if user_id in users:
+        kb = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]],
+            resize_keyboard=True
+        )
+        await message.answer("Ты уже зарегистрирован!\nНажми на кнопку ниже, чтобы найти кого-то 😉", reply_markup=kb)
+    else:
+        users.add(user_id)
+        await state.set_state(Profile.name)
+        await message.answer("Привет! Давай начнем. Как тебя зовут?")
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
