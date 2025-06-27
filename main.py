@@ -38,3 +38,11 @@ async def on_shutdown():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT)
+from database import engine, Base
+
+@app.on_event("startup")
+async def startup():
+    await bot.set_webhook(f"{WEBHOOK_URL}{WEBHOOK_PATH}")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logging.info("Webhook установлен и база создана.")
