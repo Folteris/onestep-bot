@@ -70,4 +70,62 @@ async def process_country(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(Form.city)
     keyboard = InlineKeyboardMarkup()
     for city in CITIES[country]:
-        keyboard.add(InlineKeyboardButton(text=city
+        keyboard.add(InlineKeyboardButton(text=city, callback_data=f"city_{city}"))
+    await bot.send_message(callback_query.from_user.id, "Выбери город:", reply_markup=keyboard)
+
+@dp.callback_query(F.data.startswith("city_"))
+async def process_city(callback_query: CallbackQuery, state: FSMContext):
+    city = callback_query.data.split('_')[1]
+    await state.update_data(city=city)
+    await state.set_state(Form.goal)
+    keyboard = InlineKeyboardMarkup()
+    for goal in GOALS:
+        keyboard.add(InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}"))
+    await bot.send_message(callback_query.from_user.id, "Что ты сегодня ищешь?", reply_markup=keyboard)
+
+@dp.callback_query(F.data.startswith("goal_"))
+async def process_goal(callback_query: CallbackQuery, state: FSMContext):
+    goal = callback_query.data.split('_')[1]
+    await state.update_data(goal=goal)
+    await state.set_state(Form.bio)
+    await bot.send_message(callback_query.from_user.id, "Расскажи немного о себе")
+
+@dp.message(Form.bio)
+async def process_bio(message: Message, state: FSMContext):
+    await state.update_data(bio=message.text)
+    await state.set_state(Form.photo)
+    await message.answer("Отправь своё фото")
+
+@dp.message(Form.photo, F.content_type == ContentType.PHOTO)
+async def process_photo(message: Message, state: FSMContext):
+    data = await state.get_data()
+    data['photo'] = message.photo[-1].file_id
+    users[message.from_user.id] = data
+    await state.clear()
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton("🔍 Найти собеседника")]],
+        resize_keyboard=True
+    )
+    await message.answer("🎉 Анкета создана! Теперь ты можешь искать людей 👇", reply_markup=kb)
+
+@dp.message(F.text == "/find")
+@dp.message(F.text == "🔍 Найти собеседника")
+async def find_by_button(message: Message):
+    await find_match(message)
+
+async def find_match(message: Message):
+    user = users.get(message.from_user.id)
+    if not user:
+        return await message.answer("Сначала заполни анкету командой /start")
+    for user_id, data in users.items():
+        if user_id != message.from_user.id and data['city'] == user['city'] and data['goal'] == user['goal']:
+            text = f"👤 {data['name']}, {data['age']} лет\n📍 {data['city']}, {data['country']}\n🌟 Цель: {data['goal']}\n📝 {data['bio']}"
+            await bot.send_photo(message.chat.id, data['photo'], caption=text)
+            return
+    await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
+
+def get_bot():
+    return bot
+
+def get_dispatcher():
+    return dp
