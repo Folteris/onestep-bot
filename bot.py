@@ -122,4 +122,9 @@ async def find_match(message: types.Message):
             return
     await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
 
+def get_bot():
+    return bot
+
+def get_dispatcher():
+    return dp
 
