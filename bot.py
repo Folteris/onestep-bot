@@ -109,3 +109,9 @@ async def find_match(message: types.Message):
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
+def get_bot():
+    return bot
+
+def get_dispatcher():
+    return dp
+
