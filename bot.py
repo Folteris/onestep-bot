@@ -1,20 +1,23 @@
 import logging
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import (
-    Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton, ContentType
-)
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram import Router
+from sqlalchemy import select
+from database import User, get_session
 
-API_TOKEN = '7606994315:AAGuq7yqLks531exYmD8zGEPc4A_Kh9AA3s'
+bot = Bot(token=os.getenv("BOT_TOKEN"))
+dp = Dispatcher(storage=MemoryStorage())
+router = Router()
 
-logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=API_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+COUNTRIES = ['Украина', 'Польша']
+CITIES = {
+    'Украина': ['Киев', 'Львов', 'Харьков', 'Одесса', 'Днепр', 'Запорожье', 'Чернигов', 'Ивано-Франковск', 'Тернополь'],
+    'Польша': ['Варшава', 'Краков', 'Гданьск']
+}
+GOALS = ['Общение', 'Дружба', 'Отношения']
 
 class Form(StatesGroup):
     name = State()
@@ -25,104 +28,110 @@ class Form(StatesGroup):
     bio = State()
     photo = State()
 
-users = {}
-
-COUNTRIES = ['Украина', 'Польша']
-CITIES = {
-    'Украина': ['Киев', 'Львов', 'Харьков'],
-    'Польша': ['Варшава', 'Краков', 'Гданьск']
-}
-GOALS = ['Общение', 'Дружба', 'Отношения']
-
 @dp.message(F.text == "/start")
-async def cmd_start(message: Message, state: FSMContext):
-    if message.from_user.id in users:
-        kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]],
-            resize_keyboard=True
-        )
-        await message.answer("Ты уже зарегистрирован!\nНажми на кнопку ниже, чтобы найти кого-то 😉", reply_markup=kb)
-    else:
-        await state.set_state(Form.name)
-        await message.answer("👋 Привет! Как тебя зовут?")
+async def start(message: types.Message, state: FSMContext):
+    await state.clear()
+    async with get_session() as session:
+        result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+        if result.scalar():
+            kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
+            await message.answer("Ты уже зарегистрирован. Нажми кнопку ниже, чтобы начать поиск!", reply_markup=kb)
+            return
+    await message.answer("👋 Привет! Как тебя зовут?")
+    await state.set_state(Form.name)
 
 @dp.message(Form.name)
-async def process_name(message: Message, state: FSMContext):
+async def get_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(Form.age)
     await message.answer("Сколько тебе лет?")
 
 @dp.message(Form.age)
-async def process_age(message: Message, state: FSMContext):
+async def get_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
-        return await message.answer("Пожалуйста, введи число.")
+        return await message.answer("Введи число.")
     await state.update_data(age=int(message.text))
-    await state.set_state(Form.country)
     keyboard = InlineKeyboardMarkup()
     for country in COUNTRIES:
         keyboard.add(InlineKeyboardButton(text=country, callback_data=f"country_{country}"))
+    await state.set_state(Form.country)
     await message.answer("Выбери страну:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("country_"))
-async def process_country(callback_query: CallbackQuery, state: FSMContext):
-    country = callback_query.data.split('_')[1]
+async def get_country(callback: types.CallbackQuery, state: FSMContext):
+    country = callback.data.split("_")[1]
     await state.update_data(country=country)
-    await state.set_state(Form.city)
     keyboard = InlineKeyboardMarkup()
     for city in CITIES[country]:
         keyboard.add(InlineKeyboardButton(text=city, callback_data=f"city_{city}"))
-    await bot.send_message(callback_query.from_user.id, "Выбери город:", reply_markup=keyboard)
+    await state.set_state(Form.city)
+    await callback.message.edit_text("Выбери город:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("city_"))
-async def process_city(callback_query: CallbackQuery, state: FSMContext):
-    city = callback_query.data.split('_')[1]
+async def get_city(callback: types.CallbackQuery, state: FSMContext):
+    city = callback.data.split("_")[1]
     await state.update_data(city=city)
-    await state.set_state(Form.goal)
     keyboard = InlineKeyboardMarkup()
     for goal in GOALS:
         keyboard.add(InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}"))
-    await bot.send_message(callback_query.from_user.id, "Что ты сегодня ищешь?", reply_markup=keyboard)
+    await state.set_state(Form.goal)
+    await callback.message.edit_text("Что ты сегодня ищешь?", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("goal_"))
-async def process_goal(callback_query: CallbackQuery, state: FSMContext):
-    goal = callback_query.data.split('_')[1]
+async def get_goal(callback: types.CallbackQuery, state: FSMContext):
+    goal = callback.data.split("_")[1]
     await state.update_data(goal=goal)
     await state.set_state(Form.bio)
-    await bot.send_message(callback_query.from_user.id, "Расскажи немного о себе")
+    await callback.message.edit_text("Расскажи немного о себе")
 
 @dp.message(Form.bio)
-async def process_bio(message: Message, state: FSMContext):
+async def get_bio(message: types.Message, state: FSMContext):
     await state.update_data(bio=message.text)
     await state.set_state(Form.photo)
     await message.answer("Отправь своё фото")
 
-@dp.message(Form.photo, F.content_type == ContentType.PHOTO)
-async def process_photo(message: Message, state: FSMContext):
+@dp.message(Form.photo, F.photo)
+async def get_photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    data['photo'] = message.photo[-1].file_id
-    users[message.from_user.id] = data
+    async with get_session() as session:
+        user = User(
+            telegram_id=message.from_user.id,
+            name=data['name'],
+            age=data['age'],
+            country=data['country'],
+            city=data['city'],
+            goal=data['goal'],
+            bio=data['bio'],
+            photo=message.photo[-1].file_id
+        )
+        session.add(user)
+        await session.commit()
+
     await state.clear()
-    kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton("🔍 Найти собеседника")]],
-        resize_keyboard=True
-    )
-    await message.answer("🎉 Анкета создана! Теперь ты можешь искать людей 👇", reply_markup=kb)
+    kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
+    await message.answer("🎉 Анкета сохранена! Теперь можешь искать людей.", reply_markup=kb)
 
-@dp.message(F.text == "/find")
 @dp.message(F.text == "🔍 Найти собеседника")
-async def find_by_button(message: Message):
-    await find_match(message)
+async def find_match(message: types.Message):
+    async with get_session() as session:
+        result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+        me = result.scalar()
+        if not me:
+            return await message.answer("Сначала зарегистрируйся через /start")
 
-async def find_match(message: Message):
-    user = users.get(message.from_user.id)
-    if not user:
-        return await message.answer("Сначала заполни анкету командой /start")
-    for user_id, data in users.items():
-        if user_id != message.from_user.id and data['city'] == user['city'] and data['goal'] == user['goal']:
-            text = f"👤 {data['name']}, {data['age']} лет\n📍 {data['city']}, {data['country']}\n🌟 Цель: {data['goal']}\n📝 {data['bio']}"
-            await bot.send_photo(message.chat.id, data['photo'], caption=text)
-            return
-    await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
+        match_query = await session.execute(
+            select(User).where(
+                User.city == me.city,
+                User.goal == me.goal,
+                User.telegram_id != me.telegram_id
+            )
+        )
+        match = match_query.scalar()
+        if not match:
+            return await message.answer("Нет подходящих собеседников сейчас. Попробуй позже.")
+
+        text = f"\U0001F464 {match.name}, {match.age} лет\n\U0001F4CD {match.city}, {match.country}\n\U0001F31F Цель: {match.goal}\n\U0001F4DD {match.bio}"
+        await bot.send_photo(message.chat.id, match.photo, caption=text)
 
 def get_bot():
     return bot
