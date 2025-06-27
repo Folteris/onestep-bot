@@ -122,5 +122,4 @@ async def find_match(message: types.Message):
             return
     await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+
