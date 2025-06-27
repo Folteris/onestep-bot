@@ -1,39 +1,40 @@
 import os
 import logging
 from fastapi import FastAPI, Request
-from aiogram import types, Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 import uvicorn
 
-from bot import get_bot, get_dispatcher  # обязательно добавим эти функции в bot.py
+from bot import get_bot, get_dispatcher
 
-TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # например: https://onestep-bot.onrender.com
-WEBHOOK_PATH = "/webhook"
-PORT = int(os.getenv("PORT", 8000))
+logging.basicConfig(level=logging.INFO)
 
 bot = get_bot()
 dp = get_dispatcher()
 app = FastAPI()
 
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+PORT = int(os.getenv("PORT", 8000))
+WEBHOOK_PATH = "/webhook"
+
 @app.post(WEBHOOK_PATH)
-async def webhook(request: Request):
-    data = await request.json()
-    update = Update.model_validate(data)
+async def telegram_webhook(request: Request):
+    update = Update.model_validate(await request.json())
     await dp.feed_update(bot, update)
     return {"ok": True}
 
 @app.on_event("startup")
-async def startup():
-    await bot.set_webhook(f"{WEBHOOK_URL}{WEBHOOK_PATH}")
-    logging.info("Webhook установлен.")
+async def on_startup():
+    if not WEBHOOK_URL:
+        logging.error("WEBHOOK_URL is not set!")
+    else:
+        await bot.set_webhook(f"{WEBHOOK_URL}{WEBHOOK_PATH}")
+        logging.info(f"Webhook установлен: {WEBHOOK_URL}{WEBHOOK_PATH}")
 
 @app.on_event("shutdown")
-async def shutdown():
+async def on_shutdown():
     await bot.delete_webhook()
     logging.info("Webhook удалён.")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     uvicorn.run("main:app", host="0.0.0.0", port=PORT)
