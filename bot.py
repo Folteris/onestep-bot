@@ -24,7 +24,6 @@ class Form(StatesGroup):
 
 users = {}
 
-# Страны и города (упрощенно)
 COUNTRIES = ['Украина', 'Польша']
 CITIES = {
     'Украина': ['Киев', 'Львов', 'Харьков'],
@@ -39,7 +38,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
             keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]],
             resize_keyboard=True
         )
-        await message.answer("Ты уже зарегистрирован!\nНажми на кнопку ниже, чтобы найти кого-то 😉", reply_markup=kb)
+        await message.answer("Ты уже регистрирован!\nНажми на кнопку ниже, чтобы найти кого-то 😉", reply_markup=kb)
     else:
         await Form.name.set()
         await message.answer("👋 Привет! Как тебя зовут?")
@@ -101,7 +100,6 @@ async def process_photo(message: types.Message, state: FSMContext):
     users[message.from_user.id] = data
     await state.finish()
 
-    # Добавим кнопку
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton("🔍 Найти собеседника")]],
         resize_keyboard=True
@@ -112,13 +110,14 @@ async def process_photo(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: message.text == "🔍 Найти собеседника")
 async def find_by_button(message: types.Message):
     await find_match(message)
+
 async def find_match(message: types.Message):
     user = users.get(message.from_user.id)
     if not user:
         return await message.answer("Сначала заполни анкету командой /start")
     for user_id, data in users.items():
         if user_id != message.from_user.id and data['city'] == user['city'] and data['goal'] == user['goal']:
-            text = f"👤 {data['name']}, {data['age']} лет\n📍 {data['city']}, {data['country']}\n🎯 Цель: {data['goal']}\n📝 {data['bio']}"
+            text = f"👤 {data['name']}, {data['age']} лет\n📍 {data['city']}, {data['country']}\n🌟 Цель: {data['goal']}\n📝 {data['bio']}"
             await bot.send_photo(message.chat.id, data['photo'], caption=text)
             return
     await message.answer("Пока нет подходящих пользователей онлайн. Попробуй позже!")
