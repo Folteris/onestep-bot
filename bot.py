@@ -96,7 +96,6 @@ async def get_bio(message: types.Message, state: FSMContext):
 async def get_photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
     async with get_session() as session:
-        # Проверим, есть ли пользователь, чтобы обновить данные, иначе создать
         result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
         user = result.scalars().first()
         if not user:
