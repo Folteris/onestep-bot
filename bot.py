@@ -1,16 +1,17 @@
+import os
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram import Router
 from sqlalchemy import select
 from database import User, get_session
 
+logging.basicConfig(level=logging.INFO)
+
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher(storage=MemoryStorage())
-router = Router()
 
 COUNTRIES = ['Украина', 'Польша']
 CITIES = {
@@ -33,7 +34,8 @@ async def start(message: types.Message, state: FSMContext):
     await state.clear()
     async with get_session() as session:
         result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-        if result.scalar():
+        user = result.scalars().first()
+        if user:
             kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
             await message.answer("Ты уже зарегистрирован. Нажми кнопку ниже, чтобы начать поиск!", reply_markup=kb)
             return
@@ -94,16 +96,18 @@ async def get_bio(message: types.Message, state: FSMContext):
 async def get_photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
     async with get_session() as session:
-        user = User(
-            telegram_id=message.from_user.id,
-            name=data['name'],
-            age=data['age'],
-            country=data['country'],
-            city=data['city'],
-            goal=data['goal'],
-            bio=data['bio'],
-            photo=message.photo[-1].file_id
-        )
+        # Проверим, есть ли пользователь, чтобы обновить данные, иначе создать
+        result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+        user = result.scalars().first()
+        if not user:
+            user = User(telegram_id=message.from_user.id)
+        user.name = data['name']
+        user.age = data['age']
+        user.country = data['country']
+        user.city = data['city']
+        user.goal = data['goal']
+        user.bio = data['bio']
+        user.photo = message.photo[-1].file_id
         session.add(user)
         await session.commit()
 
@@ -115,7 +119,7 @@ async def get_photo(message: types.Message, state: FSMContext):
 async def find_match(message: types.Message):
     async with get_session() as session:
         result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-        me = result.scalar()
+        me = result.scalars().first()
         if not me:
             return await message.answer("Сначала зарегистрируйся через /start")
 
@@ -126,11 +130,16 @@ async def find_match(message: types.Message):
                 User.telegram_id != me.telegram_id
             )
         )
-        match = match_query.scalar()
+        match = match_query.scalars().first()
         if not match:
             return await message.answer("Нет подходящих собеседников сейчас. Попробуй позже.")
 
-        text = f"\U0001F464 {match.name}, {match.age} лет\n\U0001F4CD {match.city}, {match.country}\n\U0001F31F Цель: {match.goal}\n\U0001F4DD {match.bio}"
+        text = (
+            f"\U0001F464 {match.name}, {match.age} лет\n"
+            f"\U0001F4CD {match.city}, {match.country}\n"
+            f"\U0001F31F Цель: {match.goal}\n"
+            f"\U0001F4DD {match.bio}"
+        )
         await bot.send_photo(message.chat.id, match.photo, caption=text)
 
 def get_bot():
