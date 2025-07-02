@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from redis.asyncio import Redis
 from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy import select
 from database import User, get_session
@@ -15,7 +16,16 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
-storage = RedisStorage(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+# Создаём Redis клиент
+redis_client = Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=REDIS_PASSWORD,
+    decode_responses=True,
+)
+
+# Создаём storage для FSM на базе Redis
+storage = RedisStorage(redis=redis_client)
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher(storage=storage)
