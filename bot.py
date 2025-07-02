@@ -4,14 +4,21 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy import select
 from database import User, get_session
 
 logging.basicConfig(level=logging.INFO)
 
+# Настройки Redis из переменных окружения
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+storage = RedisStorage(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+
 bot = Bot(token=os.getenv("BOT_TOKEN"))
-dp = Dispatcher(storage=MemoryStorage())
+dp = Dispatcher(storage=storage)
 
 COUNTRIES = ['Украина', 'Польша']
 CITIES = {
