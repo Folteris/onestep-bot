@@ -1,5 +1,6 @@
 aiogram==3.4.1
 aioredis==2.0.1
+redis>=4.5.1
 fastapi
 uvicorn
 sqlalchemy[asyncio]
