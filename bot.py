@@ -71,11 +71,12 @@ async def get_age(message: types.Message, state: FSMContext):
         return await message.answer("Введи число.")
     await state.update_data(age=int(message.text))
 
+    await state.set_state(Form.country)  # Переключаем состояние _до_ отправки сообщения
+
     keyboard = InlineKeyboardMarkup(row_width=1)
     for country in COUNTRIES:
         keyboard.add(InlineKeyboardButton(text=country, callback_data=f"country_{country}"))
 
-    await state.set_state(Form.country)
     await message.answer("Выбери страну:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("country_"))
