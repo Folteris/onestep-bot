@@ -70,35 +70,41 @@ async def get_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         return await message.answer("Введи число.")
     await state.update_data(age=int(message.text))
-    keyboard = InlineKeyboardMarkup()
-    for country in COUNTRIES:
-        keyboard.add(InlineKeyboardButton(text=country, callback_data=f"country_{country}"))
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=country, callback_data=f"country_{country}")] for country in COUNTRIES
+        ]
+    )
     await state.set_state(Form.country)
     await message.answer("Выбери страну:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("country_"))
 async def get_country(callback: types.CallbackQuery, state: FSMContext):
-    country = callback.data.split("_")[1]
+    country = callback.data.split("_", maxsplit=1)[1]
     await state.update_data(country=country)
-    keyboard = InlineKeyboardMarkup()
-    for city in CITIES[country]:
-        keyboard.add(InlineKeyboardButton(text=city, callback_data=f"city_{city}"))
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=city, callback_data=f"city_{city}")] for city in CITIES[country]
+        ]
+    )
     await state.set_state(Form.city)
     await callback.message.edit_text("Выбери город:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("city_"))
 async def get_city(callback: types.CallbackQuery, state: FSMContext):
-    city = callback.data.split("_")[1]
+    city = callback.data.split("_", maxsplit=1)[1]
     await state.update_data(city=city)
-    keyboard = InlineKeyboardMarkup()
-    for goal in GOALS:
-        keyboard.add(InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}"))
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}")] for goal in GOALS
+        ]
+    )
     await state.set_state(Form.goal)
     await callback.message.edit_text("Что ты сегодня ищешь?", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("goal_"))
 async def get_goal(callback: types.CallbackQuery, state: FSMContext):
-    goal = callback.data.split("_")[1]
+    goal = callback.data.split("_", maxsplit=1)[1]
     await state.update_data(goal=goal)
     await state.set_state(Form.bio)
     await callback.message.edit_text("Расскажи немного о себе")
