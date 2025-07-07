@@ -70,10 +70,9 @@ async def get_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         return await message.answer("Введи число.")
     await state.update_data(age=int(message.text))
+    await state.set_state(Form.country)
 
-    await state.set_state(Form.country)  # Переключаем состояние _до_ отправки сообщения
-
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard = InlineKeyboardMarkup()
     for country in COUNTRIES:
         keyboard.add(InlineKeyboardButton(text=country, callback_data=f"country_{country}"))
 
@@ -84,7 +83,7 @@ async def get_country(callback: types.CallbackQuery, state: FSMContext):
     country = callback.data.split("_", 1)[1]
     await state.update_data(country=country)
 
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard = InlineKeyboardMarkup()
     for city in CITIES.get(country, []):
         keyboard.add(InlineKeyboardButton(text=city, callback_data=f"city_{city}"))
 
@@ -97,7 +96,7 @@ async def get_city(callback: types.CallbackQuery, state: FSMContext):
     city = callback.data.split("_", 1)[1]
     await state.update_data(city=city)
 
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard = InlineKeyboardMarkup()
     for goal in GOALS:
         keyboard.add(InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}"))
 
