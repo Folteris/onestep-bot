@@ -11,12 +11,11 @@ from database import User, get_session
 
 logging.basicConfig(level=logging.INFO)
 
-# Настройки Redis из переменных окружения
+# Настройки Redis из env
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
-# Создаём Redis клиент
 redis_client = Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -24,7 +23,6 @@ redis_client = Redis(
     decode_responses=True,
 )
 
-# Создаём storage для FSM на базе Redis
 storage = RedisStorage(redis=redis_client)
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
@@ -53,7 +51,8 @@ async def start(message: types.Message, state: FSMContext):
         result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
         user = result.scalars().first()
         if user:
-            kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
+            kb = ReplyKeyboardMarkup(resize_keyboard=True)
+            kb.add(KeyboardButton("🔍 Найти собеседника"))
             await message.answer("Ты уже зарегистрирован. Нажми кнопку ниже, чтобы начать поиск!", reply_markup=kb)
             return
     await message.answer("👋 Привет! Как тебя зовут?")
@@ -73,7 +72,7 @@ async def get_age(message: types.Message, state: FSMContext):
     await state.set_state(Form.country)
 
     buttons = [InlineKeyboardButton(text=country, callback_data=f"country_{country}") for country in COUNTRIES]
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])  # Кнопки в столбик
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])  # каждый в отдельной строке
 
     await message.answer("Выбери страну:", reply_markup=keyboard)
 
@@ -134,7 +133,8 @@ async def get_photo(message: types.Message, state: FSMContext):
         await session.commit()
 
     await state.clear()
-    kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton("🔍 Найти собеседника"))
     await message.answer("🎉 Анкета сохранена! Теперь можешь искать людей.", reply_markup=kb)
 
 @dp.message(F.text == "🔍 Найти собеседника")
