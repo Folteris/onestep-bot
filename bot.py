@@ -11,7 +11,7 @@ from database import User, get_session
 
 logging.basicConfig(level=logging.INFO)
 
-# Настройки Redis из env
+# Redis настройки
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
@@ -51,8 +51,7 @@ async def start(message: types.Message, state: FSMContext):
         result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
         user = result.scalars().first()
         if user:
-            kb = ReplyKeyboardMarkup(resize_keyboard=True)
-            kb.add(KeyboardButton("🔍 Найти собеседника"))
+            kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
             await message.answer("Ты уже зарегистрирован. Нажми кнопку ниже, чтобы начать поиск!", reply_markup=kb)
             return
     await message.answer("👋 Привет! Как тебя зовут?")
@@ -72,8 +71,7 @@ async def get_age(message: types.Message, state: FSMContext):
     await state.set_state(Form.country)
 
     buttons = [InlineKeyboardButton(text=country, callback_data=f"country_{country}") for country in COUNTRIES]
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])  # каждый в отдельной строке
-
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])
     await message.answer("Выбери страну:", reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("country_"))
@@ -84,7 +82,6 @@ async def get_country(callback: types.CallbackQuery, state: FSMContext):
 
     buttons = [InlineKeyboardButton(text=city, callback_data=f"city_{city}") for city in CITIES.get(country, [])]
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])
-
     await callback.message.edit_text("Выбери город:", reply_markup=keyboard)
     await callback.answer()
 
@@ -96,7 +93,6 @@ async def get_city(callback: types.CallbackQuery, state: FSMContext):
 
     buttons = [InlineKeyboardButton(text=goal, callback_data=f"goal_{goal}") for goal in GOALS]
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[button] for button in buttons])
-
     await callback.message.edit_text("Что ты сегодня ищешь?", reply_markup=keyboard)
     await callback.answer()
 
@@ -133,8 +129,7 @@ async def get_photo(message: types.Message, state: FSMContext):
         await session.commit()
 
     await state.clear()
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(KeyboardButton("🔍 Найти собеседника"))
+    kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔍 Найти собеседника")]], resize_keyboard=True)
     await message.answer("🎉 Анкета сохранена! Теперь можешь искать людей.", reply_markup=kb)
 
 @dp.message(F.text == "🔍 Найти собеседника")
